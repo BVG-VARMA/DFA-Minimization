@@ -63,5 +63,7 @@ This project was developed as a practical implementation of the **DFA Minimizati
 ## 👨‍💻 Author
 
 **Venu Gopal Varma**
+**Rakesh**
+**Kushwanth**
 
 B.Tech CSE Student
