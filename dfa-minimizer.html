@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DFA Minimizer — Table-Filling Method</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0B1E33;
+    --panel: #10294A;
+    --panel-2: #0D2340;
+    --grid-line: rgba(143, 166, 191, 0.10);
+    --hair: rgba(143, 166, 191, 0.22);
+    --text: #E8EEF5;
+    --muted: #8FA6BF;
+    --cyan: #6FD6D0;
+    --amber: #E8A33D;
+    --coral: #E8735A;
+    --node-fill: #13315C;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    box-sizing: border-box;
+  }
+  :root:not([data-theme="light"]) { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+  }
+  body {
+    background-image:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 40px 24px 80px; }
+
+  header.top {
+    border-bottom: 1px solid var(--hair);
+    padding-bottom: 22px;
+    margin-bottom: 32px;
+  }
+  header.top .kicker {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    color: var(--cyan);
+    letter-spacing: 0.02em;
+    margin-bottom: 10px;
+  }
+  header.top h1 {
+    font-size: clamp(28px, 4vw, 40px);
+    font-weight: 700;
+    margin: 0 0 8px;
+    letter-spacing: -0.01em;
+  }
+  header.top p {
+    color: var(--muted);
+    max-width: 640px;
+    line-height: 1.55;
+    margin: 0;
+    font-size: 15px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+  @media (max-width: 860px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--hair);
+    border-radius: 4px;
+    padding: 22px;
+  }
+  .panel + .panel { margin-top: 20px; }
+
+  .panel h2 {
+    font-size: 13px;
+    letter-spacing: 0.01em;
+    color: var(--cyan);
+    margin: 0 0 16px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .panel h2 .num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--bg);
+    background: var(--cyan);
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  label {
+    display: block;
+    font-size: 12.5px;
+    color: var(--muted);
+    margin-bottom: 6px;
+    margin-top: 16px;
+  }
+  label:first-of-type { margin-top: 0; }
+
+  input[type="text"] {
+    width: 100%;
+    background: var(--panel-2);
+    border: 1px solid var(--hair);
+    color: var(--text);
+    padding: 9px 11px;
+    border-radius: 3px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13.5px;
+    outline: none;
+  }
+  input[type="text"]:focus {
+    border-color: var(--cyan);
+    box-shadow: 0 0 0 1px var(--cyan);
+  }
+  input[type="text"]::placeholder { color: #4E6580; }
+
+  .hint {
+    font-size: 11.5px;
+    color: #6F87A2;
+    margin-top: 5px;
+    line-height: 1.4;
+  }
+
+  button {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    font-size: 13.5px;
+    border: none;
+    border-radius: 3px;
+    padding: 11px 16px;
+    cursor: pointer;
+    transition: filter 0.12s ease, transform 0.05s ease;
+  }
+  button:active { transform: translateY(1px); }
+  button.primary { background: var(--cyan); color: #06251F; width: 100%; margin-top: 18px; }
+  button.primary:hover { filter: brightness(1.08); }
+  button.secondary {
+    background: transparent;
+    color: var(--cyan);
+    border: 1px solid var(--cyan);
+    width: 100%;
+    margin-top: 22px;
+  }
+  button.secondary:hover { background: rgba(111,214,208,0.08); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .error-box {
+    background: rgba(232,115,90,0.12);
+    border: 1px solid rgba(232,115,90,0.4);
+    color: #F3A997;
+    padding: 10px 12px;
+    border-radius: 3px;
+    font-size: 13px;
+    margin-top: 16px;
+    line-height: 1.5;
+    display: none;
+  }
+  .error-box.show { display: block; }
+
+  #tt-wrap { overflow-x: auto; margin-top: 4px; }
+  table.build-table {
+    border-collapse: collapse;
+    width: 100%;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+  }
+  table.build-table th, table.build-table td {
+    border: 1px solid var(--hair);
+    padding: 7px 8px;
+    text-align: center;
+    white-space: nowrap;
+  }
+  table.build-table th {
+    color: var(--cyan);
+    font-weight: 600;
+    background: rgba(111,214,208,0.06);
+  }
+  table.build-table td.rowhead {
+    text-align: left;
+    color: var(--text);
+    font-weight: 600;
+  }
+  table.build-table select {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--hair);
+    border-radius: 3px;
+    padding: 4px 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    outline: none;
+  }
+  table.build-table select:focus { border-color: var(--cyan); }
+
+  .radio-row, .check-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  input[type="radio"], input[type="checkbox"] {
+    accent-color: var(--cyan);
+    width: 14px; height: 14px;
+  }
+
+  .empty-state {
+    color: #5C7592;
+    font-size: 13.5px;
+    line-height: 1.6;
+    padding: 30px 10px;
+    text-align: left;
+  }
+
+  .section-title {
+    font-size: 14.5px;
+    font-weight: 600;
+    color: var(--text);
+    margin: 0 0 4px;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .section-title .tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    color: var(--amber);
+    border: 1px solid rgba(232,163,61,0.4);
+    padding: 1px 6px;
+    border-radius: 10px;
+  }
+  .section-sub {
+    color: var(--muted);
+    font-size: 12.5px;
+    margin: 0 0 14px;
+    line-height: 1.5;
+  }
+
+  .class-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    background: var(--panel-2);
+    border: 1px solid var(--hair);
+    padding: 5px 10px;
+    border-radius: 3px;
+    margin: 3px 6px 3px 0;
+  }
+  .class-chip .dot {
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .trace-line {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    color: var(--muted);
+    padding: 5px 0;
+    border-bottom: 1px dashed var(--grid-line);
+  }
+  .trace-line:last-child { border-bottom: none; }
+  .trace-line b { color: var(--coral); font-weight: 600; }
+  .trace-line .rd { color: var(--muted); }
+
+  table.result-table {
+    border-collapse: collapse;
+    width: 100%;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    margin-top: 4px;
+  }
+  table.result-table th, table.result-table td {
+    border: 1px solid var(--hair);
+    padding: 8px 10px;
+    text-align: center;
+  }
+  table.result-table th {
+    background: rgba(111,214,208,0.06);
+    color: var(--cyan);
+  }
+  table.result-table td.rowhead { text-align: left; font-weight: 600; }
+  table.result-table td.rowhead.final::after { content: " *"; color: var(--amber); }
+  table.result-table td.rowhead.start-marker::before { content: "→ "; color: var(--cyan); }
+
+  svg.diagram { width: 100%; height: auto; display: block; }
+  .diagram-wrap { overflow-x: auto; }
+  .diagram-caption {
+    font-size: 12px; color: var(--muted); margin-top: 8px; text-align: center;
+  }
+
+  .results-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  @media (max-width: 700px) {
+    .results-columns { grid-template-columns: 1fr; }
+  }
+
+  ::-webkit-scrollbar { height: 8px; width: 8px; }
+  ::-webkit-scrollbar-thumb { background: var(--hair); border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="kicker">FORMAL LANGUAGES &amp; AUTOMATA THEORY — TOOL</div>
+    <h1>DFA Minimizer</h1>
+    <p>Enter a DFA's states, input alphabet, transition function, start state and final states. This runs the table-filling (Myhill–Nerode) algorithm and shows you the distinguishability trace, the equivalence classes, and the minimized transition table.</p>
+  </header>
+
+  <div class="grid">
+    <div>
+      <div class="panel">
+        <h2><span class="num">1</span>Define the automaton</h2>
+
+        <label for="statesInput">States (comma-separated)</label>
+        <input type="text" id="statesInput" placeholder="A, B, C, D, E">
+        <div class="hint">Any names you like — letters, q0/q1/q2, etc.</div>
+
+        <label for="alphaInput">Input alphabet (comma-separated)</label>
+        <input type="text" id="alphaInput" placeholder="0, 1">
+        <div class="hint">The symbols the automaton reads.</div>
+
+        <button class="primary" id="buildBtn" type="button">Build transition table →</button>
+        <div class="error-box" id="buildError"></div>
+      </div>
+
+      <div class="panel" id="startFinalPanel" style="display:none;">
+        <h2><span class="num">2</span>Start &amp; final states</h2>
+        <label>Start state</label>
+        <div id="startPicker" class="mono"></div>
+        <label>Final state(s)</label>
+        <div id="finalPicker" class="mono"></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel">
+        <h2><span class="num">3</span>Transition function δ</h2>
+        <div id="tt-wrap">
+          <div class="empty-state">Enter your states and alphabet on the left, then click "Build transition table" — δ(state, symbol) dropdowns will appear here for you to fill in.</div>
+        </div>
+        <button class="secondary" id="minimizeBtn" type="button" disabled>Minimize DFA →</button>
+        <div class="error-box" id="minError"></div>
+      </div>
+
+      <div id="resultsPanel"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  const statesInput = document.getElementById('statesInput');
+  const alphaInput = document.getElementById('alphaInput');
+  const buildBtn = document.getElementById('buildBtn');
+  const buildError = document.getElementById('buildError');
+  const ttWrap = document.getElementById('tt-wrap');
+  const startFinalPanel = document.getElementById('startFinalPanel');
+  const startPicker = document.getElementById('startPicker');
+  const finalPicker = document.getElementById('finalPicker');
+  const minimizeBtn = document.getElementById('minimizeBtn');
+  const minError = document.getElementById('minError');
+  const resultsPanel = document.getElementById('resultsPanel');
+
+  let currentStates = [];
+  let currentAlpha = [];
+
+  function parseList(str) {
+    return str.split(',').map(s => s.trim()).filter(s => s.length > 0);
+  }
+
+  function showError(el, msg) {
+    el.textContent = msg;
+    el.classList.add('show');
+  }
+  function hideError(el) {
+    el.classList.remove('show');
+    el.textContent = '';
+  }
+
+  buildBtn.addEventListener('click', function(){
+    hideError(buildError);
+    const states = parseList(statesInput.value);
+    const alpha = parseList(alphaInput.value);
+
+    if (states.length < 2) {
+      showError(buildError, 'Enter at least two states — minimization needs something to compare.');
+      return;
+    }
+    if (new Set(states).size !== states.length) {
+      showError(buildError, 'State names must be unique.');
+      return;
+    }
+    if (alpha.length < 1) {
+      showError(buildError, 'Enter at least one input symbol.');
+      return;
+    }
+    if (new Set(alpha).size !== alpha.length) {
+      showError(buildError, 'Alphabet symbols must be unique.');
+      return;
+    }
+
+    currentStates = states;
+    currentAlpha = alpha;
+    buildTransitionTable(states, alpha);
+    buildStartFinalPickers(states);
+    startFinalPanel.style.display = 'block';
+    minimizeBtn.disabled = false;
+    resultsPanel.innerHTML = '';
+  });
+
+  function buildTransitionTable(states, alpha) {
+    let html = '<table class="build-table"><thead><tr><th>δ</th>';
+    alpha.forEach(a => html += `<th>${escapeHtml(a)}</th>`);
+    html += '</tr></thead><tbody>';
+    states.forEach(s => {
+      html += `<tr><td class="rowhead">${escapeHtml(s)}</td>`;
+      alpha.forEach(a => {
+        html += `<td><select data-state="${escapeAttr(s)}" data-symbol="${escapeAttr(a)}">`;
+        html += `<option value="">—</option>`;
+        states.forEach(t => {
+          html += `<option value="${escapeAttr(t)}">${escapeHtml(t)}</option>`;
+        });
+        html += `</select></td>`;
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    ttWrap.innerHTML = html;
+  }
+
+  function buildStartFinalPickers(states) {
+    let sHtml = '';
+    states.forEach((s, i) => {
+      sHtml += `<span class="radio-row" style="margin-right:14px;">
+        <input type="radio" name="startState" value="${escapeAttr(s)}" id="start-${i}" ${i===0?'checked':''}>
+        <label style="margin:0;display:inline;font-size:13px;color:var(--text);" for="start-${i}">${escapeHtml(s)}</label>
+      </span>`;
+    });
+    startPicker.innerHTML = sHtml;
+
+    let fHtml = '';
+    states.forEach((s, i) => {
+      fHtml += `<span class="check-row" style="margin-right:14px;">
+        <input type="checkbox" name="finalState" value="${escapeAttr(s)}" id="final-${i}">
+        <label style="margin:0;display:inline;font-size:13px;color:var(--text);" for="final-${i}">${escapeHtml(s)}</label>
+      </span>`;
+    });
+    finalPicker.innerHTML = fHtml;
+  }
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function escapeAttr(str) { return escapeHtml(str); }
+
+  minimizeBtn.addEventListener('click', function(){
+    hideError(minError);
+
+    const selects = ttWrap.querySelectorAll('select');
+    const trans = {};
+    let incomplete = false;
+    selects.forEach(sel => {
+      const st = sel.getAttribute('data-state');
+      const sym = sel.getAttribute('data-symbol');
+      if (!sel.value) { incomplete = true; return; }
+      trans[st + '|' + sym] = sel.value;
+    });
+    if (incomplete) {
+      showError(minError, 'Fill in every δ(state, symbol) cell — a DFA needs a defined transition for every pair.');
+      return;
+    }
+
+    const startRadio = document.querySelector('input[name="startState"]:checked');
+    if (!startRadio) {
+      showError(minError, 'Choose a start state.');
+      return;
+    }
+    const start = startRadio.value;
+
+    const finalChecks = document.querySelectorAll('input[name="finalState"]:checked');
+    const finals = new Set(Array.from(finalChecks).map(c => c.value));
+
+    const result = minimizeDFA(currentStates, currentAlpha, trans, start, finals);
+    renderResults(result, currentStates, currentAlpha, trans, start, finals);
+  });
+
+  // ---------- Core algorithm ----------
+
+  function findReachable(states, alpha, trans, start) {
+    const visited = new Set([start]);
+    const queue = [start];
+    while (queue.length) {
+      const s = queue.shift();
+      alpha.forEach(a => {
+        const t = trans[s + '|' + a];
+        if (t && !visited.has(t)) { visited.add(t); queue.push(t); }
+      });
+    }
+    return states.filter(s => visited.has(s));
+  }
+
+  function minimizeDFA(states, alpha, trans, start, finals) {
+    const reachable = findReachable(states, alpha, trans, start);
+    const unreachable = states.filter(s => !reachable.includes(s));
+    const idx = {};
+    reachable.forEach((s,i) => idx[s] = i);
+    const n = reachable.length;
+
+    const pairs = [];
+    for (let i = 0; i < n; i++) for (let j = i+1; j < n; j++) pairs.push([i,j]);
+
+    const marked = new Set();
+    const reason = {};
+
+    pairs.forEach(([i,j]) => {
+      const fi = finals.has(reachable[i]);
+      const fj = finals.has(reachable[j]);
+      if (fi !== fj) {
+        marked.add(i+','+j);
+        reason[i+','+j] = {round: 0, note: 'one final, one not'};
+      }
+    });
+
+    let round = 1;
+    const trace = [];
+    let changed = true;
+    while (changed) {
+      changed = false;
+      const roundMarks = [];
+      for (const [i,j] of pairs) {
+        const key = i+','+j;
+        if (marked.has(key)) continue;
+        for (const a of alpha) {
+          const ti = trans[reachable[i] + '|' + a];
+          const tj = trans[reachable[j] + '|' + a];
+          if (ti === tj) continue;
+          if (!ti || !tj) continue;
+          const ii = idx[ti], jj = idx[tj];
+          if (ii === jj) continue;
+          const key2 = ii < jj ? ii+','+jj : jj+','+ii;
+          if (marked.has(key2)) {
+            marked.add(key);
+            reason[key] = {round, note: `δ(·,${a}) leads to already-distinguished pair`};
+            roundMarks.push({i, j, symbol: a, via: key2});
+            changed = true;
+            break;
+          }
+        }
+      }
+      if (roundMarks.length) trace.push({round, marks: roundMarks});
+      round++;
+      if (round > n + 2) break;
+    }
+
+    const parent = reachable.map((_, i) => i);
+    function find(x){ while(parent[x] !== x){ parent[x] = parent[parent[x]]; x = parent[x]; } return x; }
+    function union(x,y){ const rx=find(x), ry=find(y); if (rx!==ry) parent[rx]=ry; }
+    pairs.forEach(([i,j]) => { if (!marked.has(i+','+j)) union(i,j); });
+
+    const groupsMap = {};
+    reachable.forEach((s, i) => {
+      const r = find(i);
+      if (!groupsMap[r]) groupsMap[r] = [];
+      groupsMap[r].push(s);
+    });
+    const classes = Object.values(groupsMap);
+    classes.sort((a,b) => {
+      const ai = Math.min(...a.map(s => reachable.indexOf(s)));
+      const bi = Math.min(...b.map(s => reachable.indexOf(s)));
+      return ai - bi;
+    });
+
+    const stateToClassName = {};
+    classes.forEach(cls => {
+      const name = '{' + cls.slice().sort().join(',') + '}';
+      cls.forEach(s => stateToClassName[s] = name);
+    });
+
+    const minStates = classes.map(cls => '{' + cls.slice().sort().join(',') + '}');
+    const minTrans = {};
+    classes.forEach(cls => {
+      const rep = cls[0];
+      const cname = stateToClassName[rep];
+      alpha.forEach(a => {
+        const t = trans[rep + '|' + a];
+        if (t) minTrans[cname + '|' + a] = stateToClassName[t];
+      });
+    });
+    const minStart = stateToClassName[start];
+    const minFinals = new Set(classes.filter(cls => cls.some(s => finals.has(s))).map(cls => stateToClassName[cls[0]]));
+
+    return {
+      reachable, unreachable, idx, pairs, marked, reason, trace,
+      classes, stateToClassName, minStates, minTrans, minStart, minFinals
+    };
+  }
+
+  // ---------- Rendering ----------
+
+  const PALETTE = ['#6FD6D0','#E8A33D','#E8735A','#8FA6BF','#B98CE0','#6FA8D6','#D6C56F','#7FE0A0'];
+
+  function renderResults(res, states, alpha, trans, start, finals) {
+    let html = '';
+
+    if (res.unreachable.length) {
+      html += `<div class="panel">
+        <div class="section-title">Unreachable states removed <span class="tag">step 1</span></div>
+        <div class="section-sub">These states can never be reached from the start state, so they're dropped before minimizing.</div>
+        <div class="mono" style="color:var(--coral);font-size:13px;">${res.unreachable.map(escapeHtml).join(', ')}</div>
+      </div>`;
+    }
+
+    html += `<div class="panel">
+      <div class="section-title">Equivalence classes found <span class="tag">${res.classes.length} of ${res.reachable.length} states</span></div>
+      <div class="section-sub">States in the same class are indistinguishable — merged into one state in the minimized DFA.</div>
+      <div>`;
+    res.classes.forEach((cls, ci) => {
+      const color = PALETTE[ci % PALETTE.length];
+      html += `<span class="class-chip"><span class="dot" style="background:${color}"></span>{${cls.slice().sort().map(escapeHtml).join(', ')}}</span>`;
+    });
+    html += `</div></div>`;
+
+    html += `<div class="panel">
+      <div class="section-title">Distinguishability trace</div>
+      <div class="section-sub">Round 0 marks pairs where one state is final and the other isn't. Each later round marks a pair if some input symbol sends it to a pair already marked distinguishable.</div>`;
+
+    const round0 = res.pairs.filter(([i,j]) => res.reason[i+','+j] && res.reason[i+','+j].round === 0);
+    if (round0.length) {
+      html += `<div class="trace-line"><span class="rd">round 0 —</span> `;
+      html += round0.map(([i,j]) => `<b>(${escapeHtml(res.reachable[i])},${escapeHtml(res.reachable[j])})</b> distinguishable: one final, one not`).join('; ');
+      html += `</div>`;
+    }
+    res.trace.forEach(t => {
+      t.marks.forEach(m => {
+        html += `<div class="trace-line"><span class="rd">round ${t.round} —</span> `;
+        html += `<b>(${escapeHtml(res.reachable[m.i])},${escapeHtml(res.reachable[m.j])})</b> distinguishable: on '${escapeHtml(m.symbol)}' it lands in an already-distinguished pair</div>`;
+      });
+    });
+    const unmarkedPairs = res.pairs.filter(([i,j]) => !res.marked.has(i+','+j));
+    if (unmarkedPairs.length) {
+      html += `<div class="trace-line" style="margin-top:6px;border-top:1px solid var(--hair);padding-top:10px;">`;
+      html += `<span class="rd">unmarked (equivalent) —</span> ` + unmarkedPairs.map(([i,j]) => `(${escapeHtml(res.reachable[i])},${escapeHtml(res.reachable[j])})`).join(', ');
+      html += `</div>`;
+    }
+    html += `</div>`;
+
+    html += `<div class="panel"><div class="results-columns">
+      <div>
+        <div class="section-title">Original δ</div>
+        ${buildResultTable(res.reachable, alpha, trans, start, finals)}
+      </div>
+      <div>
+        <div class="section-title">Minimized δ</div>
+        ${buildResultTable(res.minStates, alpha, res.minTrans, res.minStart, res.minFinals)}
+      </div>
+    </div></div>`;
+
+    html += `<div class="panel"><div class="results-columns">
+      <div>
+        <div class="section-title">Original automaton</div>
+        <div class="diagram-wrap" id="diagOrig"></div>
+        <div class="diagram-caption">Node color = equivalence class it belongs to</div>
+      </div>
+      <div>
+        <div class="section-title">Minimized automaton</div>
+        <div class="diagram-wrap" id="diagMin"></div>
+        <div class="diagram-caption">${res.classes.length} states (down from ${res.reachable.length})</div>
+      </div>
+    </div></div>`;
+
+    resultsPanel.innerHTML = html;
+
+    const classColor = {};
+    res.classes.forEach((cls, ci) => {
+      const color = PALETTE[ci % PALETTE.length];
+      cls.forEach(s => classColor[s] = color);
+    });
+    const minColor = {};
+    res.minStates.forEach((name, ci) => { minColor[name] = PALETTE[ci % PALETTE.length]; });
+
+    document.getElementById('diagOrig').innerHTML = renderDiagram(res.reachable, alpha, trans, start, finals, classColor);
+    document.getElementById('diagMin').innerHTML = renderDiagram(res.minStates, alpha, res.minTrans, res.minStart, res.minFinals, minColor);
+  }
+
+  function buildResultTable(states, alpha, trans, start, finals) {
+    let html = '<table class="result-table"><thead><tr><th>δ</th>';
+    alpha.forEach(a => html += `<th>${escapeHtml(a)}</th>`);
+    html += '</tr></thead><tbody>';
+    states.forEach(s => {
+      const isStart = s === start;
+      const isFinal = finals.has(s);
+      let cls = '';
+      if (isStart) cls += 'start-marker ';
+      if (isFinal) cls += 'final ';
+      html += `<tr><td class="rowhead ${cls.trim()}">${escapeHtml(s)}</td>`;
+      alpha.forEach(a => {
+        const t = trans[s + '|' + a] || '—';
+        html += `<td>${escapeHtml(t)}</td>`;
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    return html;
+  }
+
+  function renderDiagram(states, alpha, trans, start, finals, colorMap) {
+    const n = states.length;
+    const w = Math.max(360, 120 * Math.min(n, 6));
+    const h = Math.max(320, 120 * Math.ceil(n / 4));
+    const cx = w / 2, cy = h / 2;
+    const radius = Math.min(w, h) / 2 - 60;
+    const nodeR = 26;
+
+    const pos = {};
+    states.forEach((s, i) => {
+      const angle = (2 * Math.PI * i / n) - Math.PI/2;
+      pos[s] = { x: cx + radius * Math.cos(angle), y: cy + radius * Math.sin(angle) };
+    });
+
+    const edgeMap = {};
+    states.forEach(s => {
+      alpha.forEach(a => {
+        const t = trans[s + '|' + a];
+        if (!t) return;
+        const key = s + '=>' + t;
+        if (!edgeMap[key]) edgeMap[key] = [];
+        edgeMap[key].push(a);
+      });
+    });
+
+    let defs = `<defs>
+      <marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+        <path d="M0,0 L8,4 L0,8 Z" fill="#8FA6BF"/>
+      </marker>
+    </defs>`;
+
+    let edgesSvg = '';
+    const drawnPairs = new Set();
+    Object.keys(edgeMap).forEach(key => {
+      const [from, to] = key.split('=>');
+      const symbols = edgeMap[key].join(',');
+
+      if (from === to) {
+        const p = pos[from];
+        const loopR = 22;
+        const startX = p.x - 10, startY = p.y - nodeR + 4;
+        const endX = p.x + 10, endY = p.y - nodeR + 4;
+        const cxl = p.x, cyl = p.y - nodeR - loopR*1.6;
+        edgesSvg += `<path d="M${startX},${startY} Q${cxl-loopR},${cyl} ${p.x},${p.y-nodeR-loopR*0.9} Q${cxl+loopR},${cyl} ${endX},${endY}" fill="none" stroke="#8FA6BF" stroke-width="1.5" marker-end="url(#arrow)"/>`;
+        edgesSvg += `<text x="${p.x}" y="${p.y - nodeR - loopR*1.7}" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="#E8A33D">${escapeHtml(symbols)}</text>`;
+        return;
+      }
+
+      const reverseKey = to + '=>' + from;
+      const hasReverse = !!edgeMap[reverseKey];
+      const pairKey = [from,to].sort().join('|');
+
+      const p1 = pos[from], p2 = pos[to];
+      const dx = p2.x - p1.x, dy = p2.y - p1.y;
+      const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+      const ux = dx/dist, uy = dy/dist;
+      const startX = p1.x + ux*nodeR, startY = p1.y + uy*nodeR;
+      const endX = p2.x - ux*nodeR, endY = p2.y - uy*nodeR;
+
+      let pathD, labelX, labelY;
+      if (hasReverse) {
+        const nx = -uy, ny = ux;
+        const bend = 18 * (drawnPairs.has(pairKey) ? -1 : 1);
+        drawnPairs.add(pairKey);
+        const midX = (startX+endX)/2 + nx*bend;
+        const midY = (startY+endY)/2 + ny*bend;
+        pathD = `M${startX},${startY} Q${midX},${midY} ${endX},${endY}`;
+        labelX = midX; labelY = midY;
+      } else {
+        pathD = `M${startX},${startY} L${endX},${endY}`;
+        labelX = (startX+endX)/2; labelY = (startY+endY)/2 - 6;
+      }
+      edgesSvg += `<path d="${pathD}" fill="none" stroke="#8FA6BF" stroke-width="1.5" marker-end="url(#arrow)"/>`;
+      edgesSvg += `<rect x="${labelX-10}" y="${labelY-11}" width="${Math.max(20, symbols.length*7+6)}" height="16" fill="#0B1E33" opacity="0.85"/>`;
+      edgesSvg += `<text x="${labelX}" y="${labelY}" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" fill="#E8A33D">${escapeHtml(symbols)}</text>`;
+    });
+
+    let nodesSvg = '';
+    states.forEach(s => {
+      const p = pos[s];
+      const isFinal = finals.has(s);
+      const isStart = s === start;
+      const fill = (colorMap && colorMap[s]) ? colorMap[s] : '#13315C';
+      nodesSvg += `<g>`;
+      if (isStart) {
+        const angle = Math.atan2(p.y - cy, p.x - cx);
+        const sx = p.x - Math.cos(angle) * (nodeR + 28);
+        const sy = p.y - Math.sin(angle) * (nodeR + 28);
+        const ex = p.x - Math.cos(angle) * (nodeR + 4);
+        const ey = p.y - Math.sin(angle) * (nodeR + 4);
+        nodesSvg += `<line x1="${sx}" y1="${sy}" x2="${ex}" y2="${ey}" stroke="#6FD6D0" stroke-width="2" marker-end="url(#arrow)"/>`;
+      }
+      nodesSvg += `<circle cx="${p.x}" cy="${p.y}" r="${nodeR}" fill="${fill}" stroke="#E8EEF5" stroke-width="1.5" opacity="0.92"/>`;
+      if (isFinal) {
+        nodesSvg += `<circle cx="${p.x}" cy="${p.y}" r="${nodeR-5}" fill="none" stroke="#E8EEF5" stroke-width="1.5"/>`;
+      }
+      const label = s.length > 8 ? s.slice(0,7)+'…' : s;
+      nodesSvg += `<text x="${p.x}" y="${p.y+4}" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="${s.length > 6 ? 10 : 13}" fill="#E8EEF5" font-weight="600">${escapeHtml(label)}</text>`;
+      nodesSvg += `</g>`;
+    });
+
+    return `<svg class="diagram" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${defs}${edgesSvg}${nodesSvg}</svg>`;
+  }
+
+})();
+</script>
+</body>
+</html>
