@@ -4,13 +4,8 @@ A web-based application for minimizing Deterministic Finite Automata (DFA) using
 
 <p align="center">
 
-<a href="https://bvg-varma.github.io/DFA-Minimization/">
-  <img src="https://img.shields.io/badge/🚀_Live_Demo-Visit_Application-success?style=for-the-badge" />
-</a>
 
-<a href="https://github.com/BVG-VARMA/DFA-Minimization">
-  <img src="https://img.shields.io/badge/💻_Source_Code-GitHub-black?style=for-the-badge&logo=github" />
-</a>
+
 
 </p>
 
