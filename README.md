@@ -54,11 +54,7 @@ Minimized DFA
 
 ## 📸 Application Preview
 
-Add a screenshot of your **actual running application** here:
-
-```markdown
-![DFA Minimization Application](screenshots/dfa-minimizer.png)
-```
+![DFA Minimization Tool](images/dfa-minimization.png)
 
 ## 🎓 Purpose
 
